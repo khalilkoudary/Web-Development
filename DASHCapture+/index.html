@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>WebCodecs Demo</title>
+  </head>
+  <body>
+    <!-- Video element to display the live video feed -->
+    <video id="videoElement" width="640" height="480" autoplay></video>
+    <br>
+    <!-- Buttons to start and stop recording -->
+    <button id="startRecording">Start Recording</button>
+    <button id="stopRecording">Stop Recording</button>
+    <!-- Button to retrieve the list of the uploaded videos available from the web server -->
+    <button id="listVideos">List Videos</button>
+    <!-- Unordered list element to display the list of videos -->
+    <ul id="videoList"></ul>
+
+    <!-- Video element for video playback -->
+    <video id="playbackElement" width="640" height="480" controls></video>
+    <script>
+      // Get references to the start and stop recording buttons
+      const startRecordingBtn = document.getElementById('startRecording');
+      const stopRecordingBtn = document.getElementById('stopRecording');
+
+      // Initialize an empty array to hold the recorded video chunks
+      let chunks = [];
+
+      // Function to start recording the video
+      async function startRecording() {
+        // Specify constraints for the captured video to have 720p resolution at 30 fps
+       const constraints = {
+         video: {
+           width: { ideal: 1280 },
+           height: { ideal: 720 },
+           frameRate: { ideal: 30 }
+         },
+          audio: true
+       };
+        // Request access to the user's camera and microphone
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        
+        // Get a reference to the video element and set its source to the camera/microphone stream
+        const videoElement = document.getElementById('videoElement');
+        videoElement.srcObject = stream;
+
+        // Create a new MediaRecorder instance and set the codec to VP9
+        recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9' });
+
+        // Reset the chunks array
+        chunks = [];
+
+        // Add a listener to the recorder's "dataavailable" event to capture the video chunks
+        recorder.ondataavailable = (event) => {
+          chunks.push(event.data);
+        };
+
+        // Add a listener to the recorder's "stop" event to handle the recorded video
+        recorder.onstop = () => {
+          // Combine the recorded video chunks into a single Blob
+          const blob = new Blob(chunks, { type: 'video/mp4' });
+          
+          // Create a new FormData object and append the recorded video Blob to it
+          const formData = new FormData();
+          const filename = 'recorded_video.mp4'; 
+          formData.append('file', blob, filename);
+
+          // Create a new XMLHttpRequest object and send the recorded video to the server
+          const xhr = new XMLHttpRequest();
+          xhr.open('POST', 'http://localhost:6670/save-video');
+          xhr.send(formData);
+        };
+
+        // Start recording the video
+        recorder.start();
+      }
+
+      // Function to stop recording the video
+      function stopRecording() {
+        // Stop the recorder
+        recorder.stop();
+
+        // Stop all tracks from the video stream
+        const videoElement = document.getElementById('videoElement');
+        videoElement.srcObject.getTracks().forEach(track => track.stop());
+      }
+      // Get references to the "List Videos" button and the video list element
+      const listVideosBtn = document.getElementById('listVideos');
+      const videoListElement = document.getElementById('videoList');
+
+      // Function to list the available videos from the server
+      async function listVideos() {
+       // Fetch the list of video files from the server
+       const response = await fetch('http://localhost:6670/list-videos');
+  
+       // Parse the JSON response to get the video file names
+       const videoList = await response.json();
+  
+       // Get a reference to the video playback element
+       const playbackElement = document.getElementById('playbackElement');
+
+       // Clear the current list of video names
+       videoListElement.innerHTML = '';
+
+       // Iterate over each video file in the video list
+       videoList.forEach(video => {
+         // Create a new list item and anchor elements
+         const li = document.createElement('li');
+         const link = document.createElement('a');
+    
+         // Set the anchor element's href attribute to the video file URL
+         link.href = `http://localhost:6670/videos/${video}`;
+    
+         // Set the anchor element's text content to the video file name
+         link.textContent = video;
+
+         // Add a click event listener to the anchor element
+         link.addEventListener('click', (e) => {
+           // Prevent the default action of navigating to the video URL
+           e.preventDefault();
+      
+           // Set the video playback element's src attribute to the video file URL
+           playbackElement.src = link.href;
+      
+           // Start playing the video
+           playbackElement.play();
+           });
+
+         // Append the anchor element to the list item and the list item to the video list element
+         li.appendChild(link);
+         videoListElement.appendChild(li);
+       });
+      }
+
+      // Add event listeners to the start and stop recording buttons
+      startRecordingBtn.addEventListener('click', startRecording);
+      stopRecordingBtn.addEventListener('click', stopRecording);
+      listVideosBtn.addEventListener('click', listVideos);
+
+    </script>
+  </body>
+</html>
