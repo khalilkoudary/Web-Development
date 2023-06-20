@@ -1,5 +1,4 @@
 Name: Khalil Koudary
-Student ID: 40088454
 
 WebCodecs Demo
 
